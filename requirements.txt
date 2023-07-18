@@ -1,0 +1,4 @@
+mediapipe==0.10.0
+opencv-python
+numpy
+Dlib
