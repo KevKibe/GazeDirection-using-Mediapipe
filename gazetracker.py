@@ -2,7 +2,8 @@ import cv2
 from eye_tracker import EyeTracker
 
 class GazeDirection:
-    def __init__(self,cap):
+    def __init__(self):
+        cap = cv2.VideoCapture(0)
         self.eye_tracker = EyeTracker(cap)
         
     def refresh(self, frame):

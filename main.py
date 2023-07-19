@@ -1,7 +1,7 @@
 from gazetracker import GazeDirection
 import cv2
 
-gaze = GazeDirection(cap)
+gaze = GazeDirection()
 
 # Webcam capture
 cap = cv2.VideoCapture(0)
