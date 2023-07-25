@@ -2,7 +2,6 @@ import cv2 as cv
 import numpy as np
 import mediapipe as mp
 
-mp_face_mesh = mp.solutions.face_mesh
 LEFT_IRIS = [474, 475, 476, 477]
 RIGHT_IRIS = [469, 470, 471, 472]
 
@@ -18,9 +17,6 @@ class IrisTracker:
         self.cap = cv.VideoCapture(0)
         self.RIGHT_IRIS = RIGHT_IRIS
         self.LEFT_IRIS = LEFT_IRIS
-
-
-
 
     def find_iris_centers(self, landmarks):
         (cx, cy), radius = cv.minEnclosingCircle(landmarks)
@@ -47,7 +43,7 @@ class IrisTracker:
             return None, None, frame
 
 
-class EyeTracker:
+class DirectionTracker:
     def __init__(self, cap):
         self.iris_tracker = IrisTracker()
         self.cap = cap
@@ -115,9 +111,9 @@ if __name__ == '__main__':
 
 
     cap = cv.VideoCapture(0)
-    eye_tracker = EyeTracker(cap)
-    eye_tracker.run()
-    eye_tracker.cap.release()
+    direction_tracker = DirectionTracker(cap)
+    direction_tracker.run()
+    direction_tracker.cap.release()
     cv.destroyAllWindows()
 
 
