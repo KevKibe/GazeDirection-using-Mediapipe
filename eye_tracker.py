@@ -1,186 +1,129 @@
-import cv2
-import mediapipe as mp
+import cv2 as cv
 import numpy as np
-from calibration import Calibration
+import mediapipe as mp
 
+mp_face_mesh = mp.solutions.face_mesh
+LEFT_IRIS = [474, 475, 476, 477]
+RIGHT_IRIS = [469, 470, 471, 472]
 
-class FaceMesh:
+class IrisTracker:
     def __init__(self):
         self.mp_face_mesh = mp.solutions.face_mesh
-        self.mp_drawing = mp.solutions.drawing_utils
-        self.mp_drawing_styles = mp.solutions.drawing_styles
-
-        self.FACE_CONNECTIONS = [[33, 246], [133, 159]]
-
         self.face_mesh = self.mp_face_mesh.FaceMesh(
             max_num_faces=1,
             refine_landmarks=True,
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5
         )
+        self.cap = cv.VideoCapture(0)
+        self.RIGHT_IRIS = RIGHT_IRIS
+        self.LEFT_IRIS = LEFT_IRIS
 
-    def process_frame(self, frame):
-        image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = self.face_mesh.process(image_rgb)
-        return results
 
-    def draw_landmarks(self, frame, face_landmarks):
-        self.mp_drawing.draw_landmarks(
-            image=frame,
-            landmark_list=face_landmarks,
-            connections=self.mp_face_mesh.FACEMESH_TESSELATION,
-            landmark_drawing_spec=None,
-            connection_drawing_spec=self.mp_drawing_styles.get_default_face_mesh_tesselation_style())
-        self.mp_drawing.draw_landmarks(
-            image=frame,
-            landmark_list=face_landmarks,
-            connections=self.mp_face_mesh.FACEMESH_CONTOURS,
-            landmark_drawing_spec=None,
-            connection_drawing_spec=self.mp_drawing_styles.get_default_face_mesh_contours_style())
-        self.mp_drawing.draw_landmarks(
-            image=frame,
-            landmark_list=face_landmarks,
-            connections=self.mp_face_mesh.FACEMESH_IRISES,
-            landmark_drawing_spec=None,
-            connection_drawing_spec=self.mp_drawing_styles.get_default_face_mesh_iris_connections_style())
 
-    def extract_eye_coordinates(self, face_landmarks, frame_shape):
-        eye_coordinates = {}
 
-        if face_landmarks:
-            for i, (start, end) in enumerate(self.FACE_CONNECTIONS):
-                start_landmark = face_landmarks.landmark[start]
-                end_landmark = face_landmarks.landmark[end]
+    def find_iris_centers(self, landmarks):
+        (cx, cy), radius = cv.minEnclosingCircle(landmarks)
+        center = np.array([cx, cy], dtype=np.int32)
+        return center, radius
 
-                image_height, image_width, _ = frame_shape
-                start_x, start_y = int(start_landmark.x * image_width), int(start_landmark.y * image_height)
-                end_x, end_y = int(end_landmark.x * image_width), int(end_landmark.y * image_height)
+    def run(self, frame):
+        frame = cv.flip(frame, 1)
+        rgb_frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+        img_h, img_w = frame.shape[:2]
+        results = self.face_mesh.process(rgb_frame)
 
-                eye_coordinates[f'eye_{i+1}'] = {
-                    'start': (start_x, start_y),
-                    'end': (end_x, end_y)
-                }
+        if results.multi_face_landmarks:
+            mesh_points = np.array([np.multiply([p.x, p.y], [img_w, img_h]).astype(int) for p in results.multi_face_landmarks[0].landmark])
+            left_eye_center, left_eye_radius = self.find_iris_centers(mesh_points[self.LEFT_IRIS])
+            right_eye_center, right_eye_radius = self.find_iris_centers(mesh_points[self.RIGHT_IRIS])
+            cv.circle(frame, tuple(left_eye_center), int(left_eye_radius), (255, 0, 255), 1, cv.LINE_AA)
+            cv.circle(frame, tuple(right_eye_center), int(right_eye_radius), (255, 0, 255), 1, cv.LINE_AA)
 
-        return eye_coordinates
+            # Return the coordinates of the left and right irises
+            return left_eye_center, right_eye_center, frame
+        else:
+            print('No Iris Detected')
+            return None, None, frame
+
 
 class EyeTracker:
     def __init__(self, cap):
-        self.face_mesh = FaceMesh()
-        self.eye_coordinates = None 
+        self.iris_tracker = IrisTracker()
         self.cap = cap
-        self.calibration = Calibration()
 
-    def get_left_eye_coordinates(eye_coordinates):
-        """Returns the coordinates of the left eye."""
-        left_eye_coordinates = eye_coordinates['eye_1']
-        return left_eye_coordinates['start'], left_eye_coordinates['end']
+    def get_vertical_ratio(self,left_eye_coords,right_eye_coords):
+        left_vertical_ratio = left_eye_coords[1] / left_eye_coords[0]
+        right_vertical_ratio = right_eye_coords[1] / right_eye_coords[0]
+        return (left_vertical_ratio + right_vertical_ratio)/2
 
-    def get_right_eye_coordinates(eye_coordinates):
-        """Returns the coordinates of the right eye."""
-        right_eye_coordinates = eye_coordinates['eye_2']
-        return right_eye_coordinates['start'], right_eye_coordinates['end']
-
+    def get_horizontal_ratio(self,left_eye_coords,right_eye_coords):
+        left_horizontal_ratio = left_eye_coords[0] / left_eye_coords[1]
+        right_horizontal_ratio = right_eye_coords[0] / right_eye_coords[1]
+        return (left_horizontal_ratio + right_horizontal_ratio)/2
     
-    
-    def horizontal_ratio(self, left_eye_coords, right_eye_coords, image_undistorted):
-        left_start_x, left_start_y = left_eye_coords['start']
-        left_end_x, left_end_y = left_eye_coords['end']
-
-        right_start_x, right_start_y = right_eye_coords['start']
-        right_end_x, right_end_y = right_eye_coords['end']
-
-        left_center_x = (left_start_x + left_end_x) // 2
-        right_center_x = (right_start_x + right_end_x) // 2
-
-        image_width = image_undistorted.shape[1]
-
-        left_ratio = left_center_x / image_width
-        right_ratio = right_center_x / image_width
-
-        return (left_ratio + right_ratio) / 2    
-
-    def vertical_ratio(self, left_eye_coords, right_eye_coords, image_undistorted):
-        left_start_x, left_start_y = left_eye_coords['start']
-        left_end_x, left_end_y = left_eye_coords['end']
-
-        right_start_x, right_start_y = right_eye_coords['start']
-        right_end_x, right_end_y = right_eye_coords['end']
-
-        left_center_y = (left_start_y + left_end_y) // 2
-        right_center_y = (right_start_y + right_end_y) // 2
-
-        image_height = image_undistorted.shape[0]
-
-        left_ratio = left_center_y / image_height
-        right_ratio = right_center_y / image_height
-
-        return (left_ratio + right_ratio) / 2
-
-    def calculate_gaze_direction(self,horizontal_ratio, vertical_ratio,left_eye_coords, right_eye_coords):
-        if  horizontal_ratio(left_eye_coords,right_eye_coords) <= 0.65:
+    def is_top(self, pupil_left, pupil_right):
+        """Returns true if the user is looking towards the top"""
+        if pupil_left and pupil_right:
+            return self.vertical_ratio(pupil_left, pupil_right) <= 0.35
+        
+    def calculate_gaze_direction(self,get_horizontal_ratio,get_vertical_ratio):
+        if get_horizontal_ratio <= 0.65:
             horizontal_direction = 'left'
-        elif horizontal_ratio>= 0.35:
+        elif get_horizontal_ratio >= 1.35:
             horizontal_direction = 'right'
         else:
             horizontal_direction = 'center'
 
-        if vertical_ratio<= 0.35:
+        if get_vertical_ratio <= 0.65:
             vertical_direction = 'up'
-        elif vertical_ratio >= 0.65:
+        elif get_vertical_ratio >= 1.35:
             vertical_direction = 'down'
         else:
             vertical_direction = 'center'
-  
+
         return horizontal_direction, vertical_direction
 
     def run(self):
-        while self.cap.isOpened():
+        while True:
             ret, frame = self.cap.read()
             if not ret:
                 print("Ignoring empty camera frame.")
-                continue
 
-            image_undistorted = cv2.undistort(frame, mtx, dist, None, mtx)
-            image_undistorted = cv2.flip(image_undistorted, 1)
-
-            results = self.face_mesh.process_frame(image_undistorted)
-
-            if results.multi_face_landmarks:
-                for face_landmarks in results.multi_face_landmarks:
-                    self.face_mesh.draw_landmarks(image_undistorted, face_landmarks)
-
-                    eye_coordinates = self.face_mesh.extract_eye_coordinates(face_landmarks, image_undistorted.shape)
-                    left_eye_coords = eye_coordinates['eye_1']
-                    print("Left Eye Coordinates:", left_eye_coords)
-
-                    # Print the right eye coordinates
-                    if 'eye_2' in eye_coordinates:
-                        right_eye_coords = eye_coordinates['eye_2']
-                        print("Right Eye Coordinates:", right_eye_coords)
-
-                    horizontal_ratio = self.horizontal_ratio(eye_coordinates['eye_1'], right_eye_coords, image_undistorted)
-                    vertical_ratio = self.vertical_ratio(eye_coordinates['eye_1'], right_eye_coords, image_undistorted)
-                    direction = self.calculate_gaze_direction(horizontal_ratio, vertical_ratio,left_eye_coords, right_eye_coords)
-                    print("Gaze Direction:", direction)
-                    # Display the gaze direction on the video feed
-                    cv2.putText(image_undistorted, f"Gaze Direction: {direction}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
-
-            cv2.imshow('Calibrated Webcam', image_undistorted)
-
-            if cv2.waitKey(1) & 0xFF == 27:
                 break
+            
+            left_eye_center,right_eye_center, frame=self.iris_tracker.run(frame)
+            if left_eye_center is not None and right_eye_center is not None:
+               horizontal_ratio = self.get_horizontal_ratio(left_eye_center, right_eye_center)
+               vertical_ratio = self.get_vertical_ratio(left_eye_center, right_eye_center)
+               horizontal_direction, vertical_direction = self.calculate_gaze_direction(horizontal_ratio, vertical_ratio)
+            else:
+               horizontal_direction = 'unknown'
+               vertical_direction = 'unknown'
+                
+            print(f"Gaze direction: {horizontal_direction}, {vertical_direction}")
 
-        self.cap.release()
-        cv2.destroyAllWindows()
+            cv.putText(frame, f"Gaze Direction: {horizontal_direction}, {vertical_direction}", (10, 30), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv.imshow('Calibrated Webcam', frame)
 
-# Camera calibration parameters
-mtx = np.array([[1.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0],
-                [0.0, 0.0, 1.0]])
-dist = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
+            if cv.waitKey(1) & 0xFF == 27:
+               break
+  
+
 
 if __name__ == '__main__':
-    cap = cv2.VideoCapture(0)
+
+
+    cap = cv.VideoCapture(0)
     eye_tracker = EyeTracker(cap)
     eye_tracker.run()
+    eye_tracker.cap.release()
+    cv.destroyAllWindows()
+
+
+# # Camera calibration parameters
+# mtx = np.array([[1.0, 0.0, 0.0],
+#                 [0.0, 1.0, 0.0],
+#                 [0.0, 0.0, 1.0]])
+# dist = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
+
