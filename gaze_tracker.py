@@ -1,6 +1,7 @@
 import cv2 as cv
 import numpy as np
 import mediapipe as mp
+from calibration import WebcamCalibration
 
 LEFT_IRIS = [474, 475, 476, 477]
 RIGHT_IRIS = [469, 470, 471, 472]
@@ -46,6 +47,7 @@ class IrisTracker:
 class DirectionTracker:
     def __init__(self, cap):
         self.iris_tracker = IrisTracker()
+        self.calibration = WebcamCalibration()
         self.cap = cap
 
     def get_vertical_ratio(self,left_eye_coords,right_eye_coords):
@@ -87,8 +89,9 @@ class DirectionTracker:
                 print("Ignoring empty camera frame.")
 
                 break
-            
-            left_eye_center,right_eye_center, frame=self.iris_tracker.run(frame)
+            mtx, dist = self.calibration.calibrate()
+            frame_undistorted = cv.undistort(frame, mtx, dist, None, mtx)
+            left_eye_center,right_eye_center, frame=self.iris_tracker.run(frame_undistorted)
             if left_eye_center is not None and right_eye_center is not None:
                horizontal_ratio = self.get_horizontal_ratio(left_eye_center, right_eye_center)
                vertical_ratio = self.get_vertical_ratio(left_eye_center, right_eye_center)

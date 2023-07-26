@@ -1,77 +1,43 @@
-from __future__ import division
-import cv2
-from pupil import Pupil
+import cv2 as cv
+import numpy as np
 
+class WebcamCalibration:
+    def __init__(self, checkerboard_size=(7, 7)):
+        # Define the dimensions of the checkerboard
+        self.checkerboard_size = checkerboard_size
 
-class Calibration(object):
-    """
-    This class calibrates the pupil detection algorithm by finding the
-    best binarization threshold value for the person and the webcam.
-    """
+        # Define the criteria for termination of the iterative process of cornerSubPix
+        self.criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
-    def __init__(self):
-        self.nb_frames = 20
-        self.thresholds_left = []
-        self.thresholds_right = []
+        # Create vectors to store the 3D points and 2D image points
+        self.objpoints = []
+        self.imgpoints = []
 
-    def is_complete(self):
-        """Returns true if the calibration is completed"""
-        return len(self.thresholds_left) >= self.nb_frames and len(self.thresholds_right) >= self.nb_frames
+        # Define the 3D points in real world coordinates
+        objp = np.zeros((1, checkerboard_size[0] * checkerboard_size[1], 3), np.float32)
+        objp[0,:,:2] = np.mgrid[0:checkerboard_size[0], 0:checkerboard_size[1]].T.reshape(-1, 2)
 
-    def threshold(self, side):
-        """Returns the threshold value for the given eye.
+    def calibrate(self):
+        # Read the checkerboard images from a file
+        images = []
+        for i in range(10):
+            filename = f'checkerboard{i:02d}.jpg'
+            image = cv.imread(filename)
+            images.append(image)
 
-        Argument:
-            side: Indicates whether it's the left eye (0) or the right eye (1)
-        """
-        if side == 0:
-            return int(sum(self.thresholds_left) / len(self.thresholds_left))
-        elif side == 1:
-            return int(sum(self.thresholds_right) / len(self.thresholds_right))
+        # Find the corners of the checkerboard in the images
+        for image in images:
+            gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+            ret, corners = cv.findChessboardCorners(gray, self.checkerboard_size, cv.CALIB_CB_ADAPTIVE_THRESH + cv.CALIB_CB_FAST_CHECK + cv.CALIB_CB_NORMALIZE_IMAGE)
 
-    @staticmethod
-    def iris_size(frame):
-        """Returns the percentage of space that the iris takes up on
-        the surface of the eye.
+            # If the corners were found, add the object points and image points
+            if ret:
+                self.objpoints.append(self.objp)
+                corners2 = cv.cornerSubPix(gray, corners, (11,11), (-1,-1), self.criteria)
+                self.imgpoints.append(corners2)
 
-        Argument:
-            frame (numpy.ndarray): Binarized iris frame
-        """
-        frame = frame[5:-5, 5:-5]
-        height, width = frame.shape[:2]
-        nb_pixels = height * width
-        nb_blacks = nb_pixels - cv2.countNonZero(frame)
-        return nb_blacks / nb_pixels
+        # Calculate the camera calibration parameters
+        ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(self.objpoints, self.imgpoints, images[0].shape[::-1], None, None)
 
-    @staticmethod
-    def find_best_threshold(eye_frame):
-        """Calculates the optimal threshold to binarize the
-        frame for the given eye.
-
-        Argument:
-            eye_frame (numpy.ndarray): Frame of the eye to be analyzed
-        """
-        average_iris_size = 0.48
-        trials = {}
-
-        for threshold in range(5, 100, 5):
-            iris_frame = Pupil.image_processing(eye_frame, threshold)
-            trials[threshold] = Calibration.iris_size(iris_frame)
-
-        best_threshold, iris_size = min(trials.items(), key=(lambda p: abs(p[1] - average_iris_size)))
-        return best_threshold
-
-    def evaluate(self, eye_frame, side):
-        """Improves calibration by taking into consideration the
-        given image.
-
-        Arguments:
-            eye_frame (numpy.ndarray): Frame of the eye
-            side: Indicates whether it's the left eye (0) or the right eye (1)
-        """
-        threshold = self.find_best_threshold(eye_frame)
-
-        if side == 0:
-            self.thresholds_left.append(threshold)
-        elif side == 1:
-            self.thresholds_right.append(threshold)
+        # Return the camera matrix and distortion coefficients
+        return mtx, dist
