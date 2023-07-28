@@ -1,5 +1,5 @@
 ## Description
-- This repository contains code for a gaze direction tracking application using OpenCV, Mediapipe, and camera calibration. The application uses the Mediapipe library to track eye landmarks and calculates the gaze direction based on the relative positions of the left and right eyes.
+- This project is a Python program that uses the mediapipe and opencv libraries to track the Iris movement of a subject in real-time webcam video stream and calculate the gaze direction of the user.
 
 ## Files in the Repository
 - **[iris_tracker.py](https://github.com/KevKibe/GazeDirection-using-Mediapipe/blob/main/iris_tracker.py)** - contains the script to get the right and left iris location using Mediapipe Iris and Computer Vision.
