@@ -24,36 +24,38 @@ class DirectionTracker:
 
         
     def calculate_gaze_direction(self,get_horizontal_ratio,get_vertical_ratio):
-        if get_horizontal_ratio <= 0.60:
+        if get_horizontal_ratio <= 0.49:
             gaze_direction = 'left'
-        elif get_horizontal_ratio >= 0.62:  #mid = 0.54  left=<0.50 right 0.5
-            gaze_direction = 'right'#vert cent = 0.46
+        elif get_horizontal_ratio >= 0.53: 
+            gaze_direction = 'right'
         else:
             gaze_direction = 'center'
 
-        # if get_vertical_ratio >= 0.65:
+        # if get_vertical_ratio <= 0.50:
         #     gaze_direction = 'up'
-        # elif get_vertical_ratio <= 0.35:
+        # elif get_vertical_ratio >= 0.51:
         #     gaze_direction = 'down'
         # else:
         #     gaze_direction = 'center'
         return gaze_direction
 
     def run(self):
-        # Calibrate the camera
         ret, frame = self.cap.read()
         if not ret:
           print("Ignoring empty camera frame.")
           return
         self.calibration.calibrate_camera(frame)
-    
+
+        frame_count = 0
         while True:
             ret, frame = self.cap.read()
             if not ret:
                 print("Ignoring empty camera frame.")
                 break
-
-            # Undistort the frame
+            frame_count += 1
+            num_frames = 50
+            if frame_count % num_frames == 9:
+                self.calibration.calibrate_camera(frame)
             frame = self.calibration.undistort_frame(frame)
 
             left_eye_center, right_eye_center, frame = self.iris_tracker.run(frame)
