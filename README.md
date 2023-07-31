@@ -18,5 +18,6 @@
 ## Limitations 
 - The application works best with the subject closer to the webcam.
 - The applications works best in a well lit environment with a clear webcam camera.
+- Horizontal and vertical ratio may be different in each run because the mediapipe model like any other model doesnt produce the same prediction over and over so try playing around with the 'calculate_gaze direction' method to get better results.
 
 **:zap: I'm currently open for roles in Data Science, Machine Learning, NLP and Computer Vision.**
