@@ -36,9 +36,7 @@ class IrisTracker:
                 cv.circle(frame, tuple(left_eye_center), int(left_eye_radius), (255, 0, 255), 1, cv.LINE_AA)
                 cv.circle(frame, tuple(right_eye_center), int(right_eye_radius), (255, 0, 255), 1, cv.LINE_AA)
 
-                # Print the coordinates of the left and right irises
                 print(left_eye_center, right_eye_center)
-                # print(right_eye_center)
 
             cv.imshow('Iris_coordinate_detection', frame)
 
