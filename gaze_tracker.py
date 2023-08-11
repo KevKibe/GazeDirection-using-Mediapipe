@@ -1,14 +1,14 @@
 import cv2 as cv
 import numpy as np
 import mediapipe as mp
-from calibration import Calibration
+from calibration import CameraCalibration
 from iris_tracker import IrisTracker
 
 
 class DirectionTracker:
     def __init__(self, cap):
         self.iris_tracker = IrisTracker()
-        self.calibration = Calibration()
+        self.calibrator = CameraCalibration((24, 17), (25, 18))
         self.cap = cap
 
     def get_vertical_ratio(self,left_eye_coords,right_eye_coords):
@@ -44,7 +44,8 @@ class DirectionTracker:
         if not ret:
           print("Ignoring empty camera frame.")
           return
-        self.calibration.calibrate_camera(frame)
+        print("Frame shape:", frame.shape)
+        self.calibrator.calibrate_camera() 
 
         frame_count = 0
         while True:
@@ -52,25 +53,23 @@ class DirectionTracker:
             if not ret:
                 print("Ignoring empty camera frame.")
                 break
-            frame_count += 1
-            num_frames = 50
-            if frame_count % num_frames == 9:
-                self.calibration.calibrate_camera(frame)
-            frame = self.calibration.undistort_frame(frame)
+
+            frame = self.calibrator.calibrate_frame(frame) 
+            
 
             left_eye_center, right_eye_center, frame = self.iris_tracker.run(frame)
         
             if left_eye_center is not None and right_eye_center is not None:
                 horizontal_ratio = self.get_horizontal_ratio(left_eye_center, right_eye_center)
                 vertical_ratio = self.get_vertical_ratio(left_eye_center, right_eye_center)
-                print(horizontal_ratio, vertical_ratio)
+                # print(horizontal_ratio, vertical_ratio)
                 gaze_direction = self.calculate_gaze_direction(horizontal_ratio, vertical_ratio)
             else:
                 gaze_direction = 'unknown'
          
             # print(f"Gaze direction: {gaze_direction}")
 
-            cv.putText(frame, f"Gaze Direction: {gaze_direction}", (10, 30), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv.putText(frame, f"Gaze Direction: {left_eye_center, right_eye_center}", (10, 30), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             cv.imshow('Webcam', frame)
 
             if cv.waitKey(1) & 0xFF == 27:
