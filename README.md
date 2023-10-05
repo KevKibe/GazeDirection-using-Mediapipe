@@ -13,7 +13,7 @@
 
 ## Usage
 - Run the application by running the command `python gaze_tracker.py` in the terminal.
-- To close the application press the ESC key.<br>
+- To close the application press the Ctrl + C.<br>
 
 ## Limitations 
 - The application works best with the subject closer to the webcam.
