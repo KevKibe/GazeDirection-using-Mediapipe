@@ -1,14 +1,14 @@
 import cv2 as cv
 import numpy as np
 import mediapipe as mp
-from calibration import CameraCalibration
+from calibration import Calibration
 from iris_tracker import IrisTracker
 
 
 class DirectionTracker:
     def __init__(self, cap):
         self.iris_tracker = IrisTracker()
-        self.calibrator = CameraCalibration((24, 17), (25, 18))
+        self.calibration = Calibration()
         self.cap = cap
 
     def get_vertical_ratio(self,left_eye_coords,right_eye_coords):
@@ -24,9 +24,9 @@ class DirectionTracker:
 
         
     def calculate_gaze_direction(self,get_horizontal_ratio,get_vertical_ratio):
-        if get_horizontal_ratio <= 0.49:
+        if get_horizontal_ratio <= 1.0:
             gaze_direction = 'left'
-        elif get_horizontal_ratio >= 0.53: 
+        elif get_horizontal_ratio >= 1.1: 
             gaze_direction = 'right'
         else:
             gaze_direction = 'center'
@@ -44,8 +44,7 @@ class DirectionTracker:
         if not ret:
           print("Ignoring empty camera frame.")
           return
-        print("Frame shape:", frame.shape)
-        self.calibrator.calibrate_camera() 
+        self.calibration.calibrate_camera(frame)
 
         frame_count = 0
         while True:
@@ -53,23 +52,25 @@ class DirectionTracker:
             if not ret:
                 print("Ignoring empty camera frame.")
                 break
-
-            frame = self.calibrator.calibrate_frame(frame) 
-            
+            frame_count += 1
+            num_frames = 50
+            if frame_count % num_frames == 9:
+                self.calibration.calibrate_camera(frame)
+            frame = self.calibration.undistort_frame(frame)
 
             left_eye_center, right_eye_center, frame = self.iris_tracker.run(frame)
         
             if left_eye_center is not None and right_eye_center is not None:
                 horizontal_ratio = self.get_horizontal_ratio(left_eye_center, right_eye_center)
                 vertical_ratio = self.get_vertical_ratio(left_eye_center, right_eye_center)
-                # print(horizontal_ratio, vertical_ratio)
+                print(horizontal_ratio, vertical_ratio)
                 gaze_direction = self.calculate_gaze_direction(horizontal_ratio, vertical_ratio)
             else:
                 gaze_direction = 'unknown'
          
             # print(f"Gaze direction: {gaze_direction}")
 
-            cv.putText(frame, f"Gaze Direction: {left_eye_center, right_eye_center}", (10, 30), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv.putText(frame, f"Gaze Direction: {gaze_direction}", (10, 30), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             cv.imshow('Webcam', frame)
 
             if cv.waitKey(1) & 0xFF == 27:
@@ -89,7 +90,3 @@ if __name__ == '__main__':
     direction_tracker.run()
     direction_tracker.cap.release()
     cv.destroyAllWindows()
-
-
-
-
