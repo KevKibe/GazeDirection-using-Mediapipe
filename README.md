@@ -1,6 +1,12 @@
 ## Description
 - This project is a Python program that uses the mediapipe and opencv libraries to track the Iris movement of a subject in real-time webcam video stream and calculate the gaze direction of the user.
 
+## Screenshots
+| Left                                       | Right                                      | Center                                     |
+| ------------------------------------------ | ------------------------------------------ | ------------------------------------------ |
+| ![Image 1](https://github.com/KevKibe/GazeDirection-using-Mediapipe/assets/86055894/9f359af2-7d9e-44b3-b227-fc88d223fcfc) | ![Image 2](https://github.com/KevKibe/GazeDirection-using-Mediapipe/assets/86055894/975590fe-4a2d-49f5-b076-5bd1122c91ec) | ![Image 3](https://github.com/KevKibe/GazeDirection-using-Mediapipe/assets/86055894/a9a062d7-02ff-46c0-bb87-2e142a493e0a) |
+
+
 ## Files in the Repository
 - **[iris_tracker.py](https://github.com/KevKibe/GazeDirection-using-Mediapipe/blob/main/iris_tracker.py)** - contains the script to get the right and left iris location using Mediapipe Iris and Computer Vision.
 - **[calibration.py](https://github.com/KevKibe/GazeDirection-using-Mediapipe/blob/main/calibration.py)** - contains the script that calibrates and undistorts the frame
